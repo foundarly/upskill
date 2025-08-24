@@ -1,0 +1,50 @@
+name: workflow-pipeline
+
+on:
+  push:
+    branches:
+      - development
+      
+jobs:
+  build-and-push:
+    name: Test and Build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+          project_id: upskill-deployment
+
+      # 3️⃣ Configure Docker to use Artifact Registry
+      - name: Configure Docker
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev
+
+      # 4️⃣ Tagging step (timestamp)
+      - id: tagging
+        name: Tagging
+        run: |
+           TAG=$(date '+%Y%m%d%H%M%S')
+           echo "TAG=$TAG" >> $GITHUB_ENV
+           echo "action_tag=$TAG" >> $GITHUB_OUTPUT
+
+      # 6️⃣ Build and push frontend image
+      - name: Build and Push frontend Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            us-central1-docker.pkg.dev/upskill-deployment/upskill-frontend/frontend:latest
+            us-central1-docker.pkg.dev/upskill-deployment/upskill-frontend/frontend:${{ steps.tagging.outputs.action_tag }}
