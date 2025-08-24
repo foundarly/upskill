@@ -1,29 +1,30 @@
-# ---- Build Stage ----
-FROM node:18-alpine AS build
+# Stage 1: Build
+FROM node:18-alpine as build
+
+# Set working directory
 WORKDIR /app
 
-# Install deps
+# Install dependencies
 COPY package*.json ./
 RUN npm install
 
-# Copy rest of the source
+# Copy the rest of the app
 COPY . .
 
-# Build production-ready static assets
+# Build the app
 RUN npm run build
 
-# ---- Serve Stage ----
-FROM nginx:1.25-alpine
-WORKDIR /usr/share/nginx/html
+# Stage 2: Serve the app
+FROM nginx:alpine
 
-# Remove default nginx static assets
-RUN rm -rf ./*
+# Copy the built files from the previous stage
+COPY --from=build /app/dist /usr/share/nginx/html
 
-# Copy build artifacts from previous stage
-COPY --from=build /app/dist .
+# Copy custom NGINX configuration
+COPY nginx.conf /etc/nginx/nginx.conf
 
-# Copy custom nginx config (optional)
-# COPY nginx.conf /etc/nginx/conf.d/default.conf
-
+# Expose the default port for NGINX
 EXPOSE 8001
+
+# Start NGINX server
 CMD ["nginx", "-g", "daemon off;"]
